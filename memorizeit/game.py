@@ -163,6 +163,11 @@ class GameEngine:
         if event.type == pygame.KEYDOWN:
             if event.key == pygame.K_c:
                 self.vision.cycle_camera()
+            elif event.key == pygame.K_b:
+                self.vision.recalibrate_background()
+            elif event.key == pygame.K_r:
+                self.state = GameState.WAITING_START
+                self.center_hover_duration = 0.0
             elif event.key in (pygame.K_SPACE, pygame.K_RETURN):
                 if self.state == GameState.GAME_OVER:
                     self.state = GameState.WAITING_START
@@ -417,7 +422,7 @@ class GameEngine:
         cam_lbl = self.font_small.render(cam_name, True, (200, 240, 255))
         surface.blit(cam_lbl, (self.cam_x + 10, self.cam_y + 6))
 
-        switch_lbl = self.font_small.render("[C] Cambiar Cámara", True, (255, 215, 80))
+        switch_lbl = self.font_small.render("[C] Cam  [B] Calibrar  [Espacio] Iniciar", True, (255, 215, 80))
         surface.blit(switch_lbl, (self.cam_x + self.cam_w - switch_lbl.get_width() - 10, self.cam_y + 6))
 
         # Dedo sobre la cámara (Cursor espejo)

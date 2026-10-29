@@ -17,7 +17,7 @@ def main():
     screen_h = 720
 
     pygame.init()
-    pygame.display.set_caption("MemorizeIt - Reactor Memory (Among Us) [Raspberry Pi 4]")
+    pygame.display.set_caption("MemorizeIt - [Raspberry Pi 4]")
     screen = pygame.display.set_mode((screen_w, screen_h))
     clock = pygame.time.Clock()
 
