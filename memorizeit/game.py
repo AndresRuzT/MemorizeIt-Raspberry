@@ -79,11 +79,12 @@ class GameEngine:
         self.score_mgr.load()
 
         pygame.font.init()
-        self.font_title = pygame.font.SysFont("sans-serif", 32, bold=True)
-        self.font_large = pygame.font.SysFont("sans-serif", 24, bold=True)
-        self.font_med = pygame.font.SysFont("sans-serif", 20, bold=True)
-        self.font_small = pygame.font.SysFont("sans-serif", 14, bold=True)
-        self.font_mono = pygame.font.SysFont("monospace", 14, bold=True)
+        font_family = "arial,dejavusans,freesansbold"
+        self.font_title = pygame.font.SysFont(font_family, 32, bold=True)
+        self.font_large = pygame.font.SysFont(font_family, 24, bold=True)
+        self.font_med = pygame.font.SysFont(font_family, 20, bold=True)
+        self.font_small = pygame.font.SysFont(font_family, 14, bold=True)
+        self.font_mono = pygame.font.SysFont("monospace,dejavusansmono", 14, bold=True)
 
     def start_infinite_game(self):
         """Inicia una nueva partida infinita tras el conteo de 5s."""
