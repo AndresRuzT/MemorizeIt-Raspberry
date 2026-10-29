@@ -1,0 +1,4 @@
+"""
+MemorizeIt - Among Us Reactor Memory Game for Raspberry Pi 4
+"""
+__version__ = "1.0.0"
