@@ -86,6 +86,10 @@ class GameEngine:
         self.font_small = pygame.font.SysFont(font_family, 14, bold=True)
         self.font_mono = pygame.font.SysFont("monospace,dejavusansmono", 14, bold=True)
 
+        # Superficie pre-creada para la barra de la cámara
+        self.bar_surf = pygame.Surface((self.cam_w, 28), pygame.SRCALPHA)
+        self.bar_surf.fill((10, 15, 24, 215))
+
     def start_infinite_game(self):
         """Inicia una nueva partida infinita tras el conteo de 5s."""
         self.current_round = 1
@@ -425,10 +429,7 @@ class GameEngine:
                 surface.blit(lbl, (cx - lbl.get_width() // 2, cy - lbl.get_height() // 2))
 
         # Barra superior con nombre de la cámara actual
-        title_box = pygame.Rect(self.cam_x, self.cam_y, self.cam_w, 28)
-        bar_surf = pygame.Surface((title_box.width, title_box.height), pygame.SRCALPHA)
-        bar_surf.fill((10, 15, 24, 215))
-        surface.blit(bar_surf, (title_box.x, title_box.y))
+        surface.blit(self.bar_surf, (self.cam_x, self.cam_y))
 
         cam_name = f"CAM: {self.vision.get_camera_name()} [{self.vision.tracker_name}]"
         cam_lbl = self.font_small.render(cam_name, True, (200, 240, 255))

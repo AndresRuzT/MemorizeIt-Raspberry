@@ -23,6 +23,17 @@ class GridPanel:
 
         cell_w = (area_rect.width - 2 * spacing) / 3.0
         cell_h = (area_rect.height - 2 * spacing) / 3.0
+        self.cell_w = int(cell_w)
+        self.cell_h = int(cell_h)
+
+        # Superficies pre-asignadas para cero asignaciones dinámicas por frame
+        self.charge_surf = pygame.Surface((self.cell_w, self.cell_h), pygame.SRCALPHA)
+        self.charge_surf.fill((0, 240, 255, 110))
+
+        inner_w = int(self.cell_w * 0.62)
+        inner_h = int(self.cell_h * 0.62)
+        self.inner_surf = pygame.Surface((inner_w, inner_h), pygame.SRCALPHA)
+        self.inner_surf.fill((235, 252, 255, 190))
 
         for r in range(3):
             for c in range(3):
@@ -77,18 +88,18 @@ class GridPanel:
             # Fondo del panel con esquinas redondeadas
             pygame.draw.rect(surface, base_col, p.rect, border_radius=12)
 
-            # Si este panel está cargando los 2 segundos de pulsación, dibujar barra de energía ascendente
+            # Si este panel está cargando los 2 segundos de pulsación, barra de energía ascendente
             if p.index == charging_index and charging_progress > 0.0:
-                fill_h = p.rect.height * min(1.0, charging_progress)
-                fill_rect = pygame.Rect(
-                    p.rect.x + 4,
-                    p.rect.bottom - fill_h - 4,
-                    p.rect.width - 8,
-                    fill_h
-                )
-                charge_surf = pygame.Surface((fill_rect.width, fill_rect.height), pygame.SRCALPHA)
-                charge_surf.fill((0, 240, 255, 110))
-                surface.blit(charge_surf, (fill_rect.x, fill_rect.y))
+                fill_h = int(p.rect.height * min(1.0, charging_progress))
+                if fill_h > 0:
+                    dest_rect = pygame.Rect(
+                        p.rect.x + 4,
+                        p.rect.bottom - fill_h - 4,
+                        p.rect.width - 8,
+                        fill_h
+                    )
+                    sub_rect = pygame.Rect(0, 0, dest_rect.width, dest_rect.height)
+                    surface.blit(self.charge_surf, (dest_rect.x, dest_rect.y), area=sub_rect)
                 border_col = (255, 235, 80)
 
             # Borde metálico estilo consola
@@ -96,10 +107,9 @@ class GridPanel:
 
             # Centro brillante estilo Among Us cuando se ilumina
             if p.state in (PanelState.FLASHING, PanelState.PRESSED):
-                inner = p.rect.inflate(-p.rect.width * 0.38, -p.rect.height * 0.38)
-                inner_surf = pygame.Surface((inner.width, inner.height), pygame.SRCALPHA)
-                inner_surf.fill((235, 252, 255, 190))
-                surface.blit(inner_surf, (inner.x, inner.y))
+                inner_x = p.rect.centerx - self.inner_surf.get_width() // 2
+                inner_y = p.rect.centery - self.inner_surf.get_height() // 2
+                surface.blit(self.inner_surf, (inner_x, inner_y))
 
     def _get_colors(self, state):
         if state == PanelState.IDLE:
