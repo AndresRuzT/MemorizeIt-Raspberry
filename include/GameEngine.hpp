@@ -17,7 +17,7 @@ enum class GameState {
 
 class GameEngine {
 public:
-    GameEngine(int screenWidth, int screenHeight);
+    GameEngine(int screenWidth, int screenHeight, int cameraIndex = -1);
     ~GameEngine();
 
     void initialize();
@@ -34,6 +34,7 @@ private:
 
     int screenWidth;
     int screenHeight;
+    int initialCameraIndex;
 
     GameState state{GameState::START_SCREEN};
     GridPanel grid;
@@ -51,18 +52,18 @@ private:
     int sequenceStep{0};
     bool isStepFlashing{false};
 
-    // Temporizadores de interacción (Dwell / Debounce)
+    // Temporizadores de interacción (2 segundos de dwell time requeridos)
     int currentHoveredPanel{-1};
     float hoverDuration{0.0f};
     float debounceCooldown{0.0f};
-    const float requiredDwellTime{0.22f}; // Tiempo con el dedo fijo para activar
-    const float debounceCooldownTime{0.40f};
+    const float requiredDwellTime{2.0f}; // 2 segundos continuos con el dedo sobre el panel
+    const float debounceCooldownTime{0.60f};
 
     // Textura para la vista previa de la cámara USB
     Texture2D cameraTexture{};
     unsigned char* cameraBuffer{nullptr};
-    int previewWidth{160};
-    int previewHeight{120};
+    int previewWidth{192};
+    int previewHeight{144};
 
     // Posición del cursor en pantalla
     Vector2 pointerPos{-1.0f, -1.0f};

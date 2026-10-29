@@ -3,23 +3,34 @@
 #include <opencv2/core.hpp>
 #include <opencv2/videoio.hpp>
 #include <opencv2/imgproc.hpp>
+#include <opencv2/objdetect.hpp>
 #include <thread>
 #include <mutex>
 #include <atomic>
+#include <string>
+#include <vector>
 
 struct FingertipData {
     bool detected{false};
-    float normX{0.0f}; // 0.0 (left) to 1.0 (right)
-    float normY{0.0f}; // 0.0 (top) to 1.0 (bottom)
+    float normX{0.0f}; // 0.0 (izq) a 1.0 (der)
+    float normY{0.0f}; // 0.0 (arriba) a 1.0 (abajo)
+    int rawX{0};
+    int rawY{0};
 };
 
 class VisionTracker {
 public:
-    VisionTracker(int cameraIndex = 0, int captureWidth = 320, int captureHeight = 240);
+    VisionTracker(int cameraIndex = -1, int captureWidth = 640, int captureHeight = 480);
     ~VisionTracker();
 
     bool start();
     void stop();
+
+    // Cambiar de cámara (ej. presionar 'C')
+    void cycleCamera();
+    void setCamera(int newIndex);
+    int getCameraIndex() const;
+    std::string getCameraStatusText();
 
     // Obtener los datos más recientes de la punta del dedo (Thread-safe)
     FingertipData getFingertip();
@@ -33,26 +44,34 @@ public:
 private:
     void captureLoop();
     void processFrame(const cv::Mat& bgrFrame);
+    int detectBestCamera();
 
-    int cameraIndex;
-    int captureWidth;
-    int captureHeight;
+    int cameraIndex{-1};
+    int captureWidth{640};
+    int captureHeight{480};
 
     std::atomic<bool> isRunning{false};
+    std::atomic<bool> needsCameraReopen{false};
     std::thread workerThread;
 
     std::mutex dataMutex;
     FingertipData currentFingertip;
     cv::Mat latestRGB;
     bool hasNewFrame{false};
+    std::string cameraStatus{"Iniciando..."};
+
+    // Clasificador para suprimir rostros
+    cv::CascadeClassifier faceCascade;
+    std::vector<cv::Rect> lastDetectedFaces;
+    int frameCounter{0};
 
     // Parámetros HSV para detección de piel
-    int hMin{0}, hMax{30};
-    int sMin{45}, sMax{200};
-    int vMin{60}, vMax{255};
+    int hMin{0}, hMax{25};
+    int sMin{45}, sMax{220};
+    int vMin{50}, vMax{255};
 
-    // Suavizado exponencial para reducir temblores
+    // Suavizado exponencial para evitar saltos bruscos
     float smoothX{0.5f};
     float smoothY{0.5f};
-    const float smoothingFactor{0.35f}; // 0 = muy suave/lento, 1 = instantáneo
+    const float smoothingFactor{0.30f};
 };
