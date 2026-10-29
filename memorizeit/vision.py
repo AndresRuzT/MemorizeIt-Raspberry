@@ -24,7 +24,7 @@ class VisionTracker:
         self.camera_map = self._detect_camera_devices()
         self.valid_devices = list(self.camera_map.keys())
 
-        # Priorizar siempre la cámara USB externa (ej. índice 2)
+        # Priorizar siempre la cámara USB externa (/dev/video2)
         if camera_index is not None and camera_index in self.valid_devices:
             self.camera_index = camera_index
         elif 2 in self.valid_devices:
@@ -40,16 +40,16 @@ class VisionTracker:
 
         self.fingertip = FingertipData()
         self.latest_rgb_frame = None
-        self.cached_surface = None  # Cache de Surface para evitar parpadeos negros
+        self.cached_surface = None  # Cache para eliminar parpadeo negro
         self.has_new_frame = False
         self.pending_camera_change = None
 
-        # Suavizado exponencial para evitar vibración
+        # Suavizado exponencial para evitar saltos
         self.smooth_x = 0.5
         self.smooth_y = 0.5
         self.smoothing_factor = 0.35
 
-        # Cargar clasificador de rostros para suprimirlos activamente
+        # Cargar clasificador de rostros
         self.face_cascade = cv2.CascadeClassifier()
         cascade_paths = [
             "/usr/share/opencv4/haarcascades/haarcascade_frontalface_default.xml",
@@ -61,8 +61,13 @@ class VisionTracker:
                 print(f"[VisionTracker] Clasificador de rostros cargado: {p}")
                 break
 
+        # Parámetros adaptativos de piel (se auto-calibran con el rostro del jugador)
+        self.calibrated_skin = False
+        self.skin_mean_h = 130.0  # Valor adaptativo inicial según sensor
+        self.skin_mean_s = 65.0
+        self.skin_mean_v = 150.0
+
     def _detect_camera_devices(self):
-        """Detecta cámaras reales y sus nombres usando v4l2-ctl."""
         cam_map = {}
         try:
             out = subprocess.check_output(["v4l2-ctl", "--list-devices"], text=True, stderr=subprocess.DEVNULL)
@@ -73,11 +78,9 @@ class VisionTracker:
                 header = lines[0].split("(")[0].strip().replace(":", "")
                 devs = [l for l in lines[1:] if "/dev/video" in l]
                 if devs:
-                    # El primer nodo de cada bloque es el stream de captura real
                     match = re.search(r"/dev/video(\d+)", devs[0])
                     if match:
                         idx = int(match.group(1))
-                        # Etiqueta limpia
                         is_usb = "usb" in lines[0].lower() or "xwf" in header.lower()
                         label = f"{header} ({'USB' if is_usb else 'Integrada'})"
                         cam_map[idx] = label
@@ -125,14 +128,12 @@ class VisionTracker:
             return self.fingertip
 
     def get_preview_surface(self, target_width, target_height):
-        """Retorna una Surface de Pygame de forma continua sin parpadeos negros."""
         with self.lock:
             if self.has_new_frame and self.latest_rgb_frame is not None:
                 resized = cv2.resize(self.latest_rgb_frame, (target_width, target_height), interpolation=cv2.INTER_NEAREST)
                 self.cached_surface = pygame.surfarray.make_surface(np.transpose(resized, (1, 0, 2)))
                 self.has_new_frame = False
 
-            # Retornar siempre la última superficie válida guardada en caché
             return self.cached_surface
 
     def _open_camera(self, idx):
@@ -154,7 +155,7 @@ class VisionTracker:
         last_detected_faces = []
 
         while self.running:
-            # Gestionar cambio de cámara en caliente
+            # Cambio de cámara en caliente
             with self.lock:
                 req_change = self.pending_camera_change
                 self.pending_camera_change = None
@@ -180,51 +181,81 @@ class VisionTracker:
             mirror_frame = cv2.flip(raw_frame, 1)
             frame_h, frame_w = mirror_frame.shape[:2]
 
-            # 1. Detección periódica de rostros para suprimirlos activamente
-            if not self.face_cascade.empty() and (frame_counter % 5 == 0 or len(last_detected_faces) == 0):
+            # 1. Detección periódica de rostros para AUTO-CALIBRAR el tono de piel exacto
+            if not self.face_cascade.empty() and (frame_counter % 6 == 0 or len(last_detected_faces) == 0):
                 small = cv2.resize(mirror_frame, (160, 120), interpolation=cv2.INTER_LINEAR)
                 gray = cv2.cvtColor(small, cv2.COLOR_BGR2GRAY)
-                faces = self.face_cascade.detectMultiScale(gray, scaleFactor=1.2, minNeighbors=4, minSize=(25, 25))
+                faces = self.face_cascade.detectMultiScale(gray, scaleFactor=1.18, minNeighbors=4, minSize=(25, 25))
 
                 sx = frame_w / 160.0
                 sy = frame_h / 120.0
 
                 last_detected_faces = []
                 for (fx, fy, fw, fh) in faces:
-                    # Considerar rostro si está en el 65% superior
-                    if fy * sy < frame_h * 0.65:
-                        rx = int(fx * sx)
-                        ry = int(fy * sy)
-                        rw = int(fw * sx)
-                        rh = int(fh * sy)
-                        # Padding para tapar barbilla y orejas
-                        px = max(0, rx - int(rw * 0.15))
-                        py = max(0, ry - int(rh * 0.20))
-                        pw = min(frame_w - px, rw + int(rw * 0.30))
-                        ph = min(frame_h - py, rh + int(rh * 0.40))
-                        last_detected_faces.append((px, py, pw, ph))
+                    rx = int(fx * sx)
+                    ry = int(fy * sy)
+                    rw = int(fw * sx)
+                    rh = int(fh * sy)
 
-            # 2. Segmentación de piel robusta: HSV amplio + YCrCb
+                    # Auto-muestreo de piel en mejillas / frente del jugador
+                    patch_y1 = max(0, ry + int(rh * 0.25))
+                    patch_y2 = min(frame_h, ry + int(rh * 0.65))
+                    patch_x1 = max(0, rx + int(rw * 0.25))
+                    patch_x2 = min(frame_w, rx + int(rw * 0.75))
+
+                    if patch_y2 > patch_y1 and patch_x2 > patch_x1:
+                        patch = mirror_frame[patch_y1:patch_y2, patch_x1:patch_x2]
+                        patch_hsv = cv2.cvtColor(patch, cv2.COLOR_BGR2HSV)
+                        mh, ms, mv = cv2.mean(patch_hsv)[:3]
+
+                        # Actualización adaptativa del tono de piel
+                        self.skin_mean_h = self.skin_mean_h * 0.7 + mh * 0.3
+                        self.skin_mean_s = self.skin_mean_s * 0.7 + ms * 0.3
+                        self.skin_mean_v = self.skin_mean_v * 0.7 + mv * 0.3
+                        self.calibrated_skin = True
+
+                    # Padding para suprimir el rostro completo
+                    px = max(0, rx - int(rw * 0.15))
+                    py = max(0, ry - int(rh * 0.20))
+                    pw = min(frame_w - px, rw + int(rw * 0.30))
+                    ph = min(frame_h - py, rh + int(rh * 0.40))
+                    last_detected_faces.append((px, py, pw, ph))
+
+            # 2. Segmentación de piel adaptativa (ajustada automáticamente al jugador)
             hsv = cv2.cvtColor(mirror_frame, cv2.COLOR_BGR2HSV)
-            mask1 = cv2.inRange(hsv, np.array([0, 15, 30], dtype=np.uint8), np.array([35, 255, 255], dtype=np.uint8))
-            mask2 = cv2.inRange(hsv, np.array([160, 15, 30], dtype=np.uint8), np.array([180, 255, 255], dtype=np.uint8))
-            hsv_mask = cv2.bitwise_or(mask1, mask2)
 
-            ycrcb = cv2.cvtColor(mirror_frame, cv2.COLOR_BGR2YCrCb)
-            ycrcb_mask = cv2.inRange(ycrcb, np.array([0, 125, 65], dtype=np.uint8), np.array([255, 185, 140], dtype=np.uint8))
+            # Rango adaptativo calibrado en tiempo real
+            tol_h = 32
+            tol_s = 65
+            tol_v = 75
 
-            skin_mask = cv2.bitwise_and(hsv_mask, ycrcb_mask)
+            h_min = max(0, int(self.skin_mean_h - tol_h))
+            h_max = min(180, int(self.skin_mean_h + tol_h))
+            s_min = max(20, int(self.skin_mean_s - tol_s))
+            s_max = min(255, int(self.skin_mean_s + tol_s))
+            v_min = max(30, int(self.skin_mean_v - tol_v))
+            v_max = min(255, int(self.skin_mean_v + tol_v))
 
-            # 3. SUPRIMIR ROSTROS: Borrar la cabeza de la máscara de piel
+            mask_adaptive = cv2.inRange(hsv, np.array([h_min, s_min, v_min]), np.array([h_max, s_max, v_max]))
+
+            # Máscara de respaldo tradicional (por si la cámara tiene balance estándar)
+            mask_std1 = cv2.inRange(hsv, np.array([0, 15, 30]), np.array([30, 255, 255]))
+            mask_std2 = cv2.inRange(hsv, np.array([160, 15, 30]), np.array([180, 255, 255]))
+            mask_std = cv2.bitwise_or(mask_std1, mask_std2)
+
+            # Fusión de máscaras
+            skin_mask = cv2.bitwise_or(mask_adaptive, mask_std)
+
+            # 3. SUPRESIÓN DEL ROSTRO: Borrar la zona de la cabeza de la máscara
             for (rx, ry, rw, rh) in last_detected_faces:
                 skin_mask[ry:ry+rh, rx:rx+rw] = 0
 
-            # 4. Morfología para limpiar ruido
-            kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5))
+            # 4. Morfología para cerrar huecos y eliminar puntos aislados
+            kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (7, 7))
+            skin_mask = cv2.morphologyEx(skin_mask, cv2.MORPH_CLOSE, kernel, iterations=2)
             skin_mask = cv2.morphologyEx(skin_mask, cv2.MORPH_OPEN, kernel, iterations=1)
-            skin_mask = cv2.dilate(skin_mask, kernel, iterations=2)
 
-            # 5. Detección Inteligente de la Mano (Priorizar el brazo/mano sobre el cuello/cabeza)
+            # 5. Detección del contorno de la mano y la punta del dedo índice
             contours, _ = cv2.findContours(skin_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
             best_contour = None
@@ -232,29 +263,25 @@ class VisionTracker:
 
             for cnt in contours:
                 area = cv2.contourArea(cnt)
-                if area < 400.0:
+                if area < 500.0:
                     continue
 
-                # Puntos clave del contorno
                 topmost = tuple(cnt[cnt[:, :, 1].argmin()][0])
                 bottommost = tuple(cnt[cnt[:, :, 1].argmax()][0])
 
-                # ¿El contorno se origina desde la mitad inferior o bordes inferiores de la cámara?
-                # Los brazos y manos entran por abajo (Y > frame_h * 0.5)
-                touches_bottom = bottommost[1] > (frame_h * 0.55)
+                # Bonificación si proviene de la mitad inferior de la cámara (brazo/mano)
+                touches_bottom = bottommost[1] > (frame_h * 0.50)
 
-                # Calcular puntuación:
-                # - Gran bonificación si viene desde la parte inferior (es un brazo/mano extendida)
-                # - Bonificación por alcanzar mayor altura (menor Y del topmost)
-                # - Ponderación del área
                 score = area * 0.05
                 if touches_bottom:
-                    score += 5000.0
-                score += (frame_h - topmost[1]) * 10.0  # Cuanto más arriba apunte, más probable que sea el dedo
+                    score += 6000.0
 
-                # Penalizar contornos flotantes aislados en la parte superior central (posibles restos de cabeza/cuello)
-                if not touches_bottom and topmost[1] < frame_h * 0.40 and (frame_w * 0.25 < topmost[0] < frame_w * 0.75):
-                    score -= 3000.0
+                # Bonificación por altura (el dedo se extiende hacia los paneles)
+                score += (frame_h - topmost[1]) * 15.0
+
+                # Descartar manchas flotantes en el centro superior (restos de cuello)
+                if not touches_bottom and topmost[1] < frame_h * 0.35 and (frame_w * 0.3 < topmost[0] < frame_w * 0.7):
+                    score -= 4000.0
 
                 if score > best_score:
                     best_score = score
@@ -281,13 +308,14 @@ class VisionTracker:
             # 6. Preparar vista previa en color RGB
             rgb_frame = cv2.cvtColor(mirror_frame, cv2.COLOR_BGR2RGB)
 
-            # Dibujar rostros ignorados
+            # Marcar rostros ignorados
             for (rx, ry, rw, rh) in last_detected_faces:
                 cv2.rectangle(rgb_frame, (rx, ry), (rx + rw, ry + rh), (255, 60, 60), 2)
-                cv2.putText(rgb_frame, "ROSTRO IGNORADO", (rx + 4, ry - 6),
-                            cv2.FONT_HERSHEY_PLAIN, 1.0, (255, 80, 80), 1)
+                status_lbl = "ROSTRO IGNORADO" if not self.calibrated_skin else "PIEL CALIBRADA"
+                cv2.putText(rgb_frame, status_lbl, (rx + 4, ry - 6),
+                            cv2.FONT_HERSHEY_PLAIN, 1.0, (255, 100, 100), 1)
 
-            # Dibujar dedo índice detectado
+            # Dibujar la punta del dedo detectada en verde brillante con retícula
             if result.detected:
                 px = int(result.norm_x * frame_w)
                 py = int(result.norm_y * frame_h)
