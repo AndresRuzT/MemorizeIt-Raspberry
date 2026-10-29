@@ -46,6 +46,7 @@ class GameEngine:
         # Temporizadores de inicio con dedo en el centro (5 segundos)
         self.center_dwell_time = 5.0
         self.center_hover_duration = 0.0
+        self.center_lost_timer = 0.0
         self.last_beep_second = 6
 
         # Temporizadores de reproducción
@@ -56,6 +57,7 @@ class GameEngine:
         # Temporizador de interacción del juego (2.0 segundos continuos)
         self.required_dwell_time = 2.0
         self.hover_duration = 0.0
+        self.hover_lost_timer = 0.0
         self.current_hovered_panel = -1
         self.debounce_cooldown = 0.0
         self.debounce_cooldown_time = 0.50
@@ -176,10 +178,11 @@ class GameEngine:
                     self.start_infinite_game()
 
     def _update_waiting_start(self, dt, pointer_active, norm_x, norm_y):
-        # La zona central corresponde a norm_x entre 0.35-0.65 y norm_y entre 0.35-0.65
+        # La zona central corresponde a norm_x entre 0.33-0.67 y norm_y entre 0.33-0.67
         in_center = pointer_active and (0.33 <= norm_x <= 0.67) and (0.33 <= norm_y <= 0.67)
 
         if in_center:
+            self.center_lost_timer = 0.0
             self.center_hover_duration += dt
             sec_rem = int(math.ceil(max(0.0, self.center_dwell_time - self.center_hover_duration)))
 
@@ -192,9 +195,11 @@ class GameEngine:
                 self.sound.play_success_chime()
                 self.start_infinite_game()
         else:
-            # Si retira el dedo del centro antes de los 5s, reiniciar conteo
-            self.center_hover_duration = 0.0
-            self.last_beep_second = 6
+            # Gracia de 0.25s para tolerar micro-parpadeos o pérdidas transitorias
+            self.center_lost_timer += dt
+            if self.center_lost_timer > 0.25:
+                self.center_hover_duration = 0.0
+                self.last_beep_second = 6
 
     def _update_show_sequence(self, dt):
         self.timer -= dt
@@ -212,6 +217,7 @@ class GameEngine:
                     self.player_step = 0
                     self.current_hovered_panel = -1
                     self.hover_duration = 0.0
+                    self.hover_lost_timer = 0.0
                     self.debounce_cooldown = 0.35
             else:
                 self.is_step_flashing = False
@@ -219,7 +225,7 @@ class GameEngine:
                 self.timer = 0.22
 
     def _update_player_turn(self, dt, pointer_active, grid_pixel_pos, norm_x, norm_y):
-        # Determinar el panel en base a las coordenadas del dedo (0 a 8)
+        # Determinar el panel en base a las coordenadas del dedo índice (0 a 8)
         hovered = -1
         if pointer_active:
             col = int(norm_x * 3)
@@ -234,6 +240,7 @@ class GameEngine:
 
         if hovered != -1 and self.debounce_cooldown <= 0.0:
             if hovered == self.current_hovered_panel:
+                self.hover_lost_timer = 0.0
                 self.hover_duration += dt
                 # Confirmar tras 2.0 segundos continuos
                 if self.hover_duration >= self.required_dwell_time:
@@ -243,9 +250,13 @@ class GameEngine:
             else:
                 self.current_hovered_panel = hovered
                 self.hover_duration = 0.0
+                self.hover_lost_timer = 0.0
         else:
-            self.current_hovered_panel = -1
-            self.hover_duration = 0.0
+            # Gracia de 0.20s para tolerar micro-fluctuaciones
+            self.hover_lost_timer += dt
+            if self.hover_lost_timer > 0.20:
+                self.current_hovered_panel = -1
+                self.hover_duration = 0.0
 
     def _trigger_panel_press(self, index):
         expected = self.full_sequence[self.player_step]

@@ -1,5 +1,18 @@
 #!/usr/bin/env python3
 import sys
+import os
+from pathlib import Path
+
+# Auto-reexec into .venv if not already running in it (ensures MediaPipe is available)
+_venv_python = (Path(__file__).parent / ".venv" / "bin" / "python").absolute()
+if not _venv_python.exists():
+    _alt_venv = Path("/home/andres/Documents/OwnProjects/MazeHaus-Raspberry/.venv/bin/python").absolute()
+    if _alt_venv.exists():
+        _venv_python = _alt_venv
+
+if _venv_python.exists() and Path(sys.executable).absolute() != _venv_python:
+    os.execv(str(_venv_python), [str(_venv_python)] + sys.argv)
+
 import argparse
 import pygame
 from memorizeit.game import GameEngine
