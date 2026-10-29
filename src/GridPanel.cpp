@@ -49,7 +49,7 @@ void GridPanel::draw() {
         DrawRectangleRounded(p.bounds, 0.18f, 6, baseColor);
 
         // Borde estilizado estilo consola Among Us
-        DrawRectangleRoundedLines(p.bounds, 0.18f, 6, 3.0f, borderColor);
+        DrawRectangleRoundedLinesEx(p.bounds, 0.18f, 6, 3.0f, borderColor);
 
         // Indicador central brillante si está activo
         if (p.state == PanelVisualState::FLASHING || p.state == PanelVisualState::PRESSED) {

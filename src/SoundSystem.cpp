@@ -70,7 +70,7 @@ Sound SoundSystem::createTone(float frequency, float duration, int waveformType)
     const int sampleRate = 44100;
     const int frameCount = static_cast<int>(sampleRate * duration);
 
-    Wave wave = { 0 };
+    Wave wave{};
     wave.frameCount = frameCount;
     wave.sampleRate = sampleRate;
     wave.sampleSize = 16;
