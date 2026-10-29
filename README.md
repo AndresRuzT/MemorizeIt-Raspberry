@@ -1,76 +1,53 @@
 # MemorizeIt - Among Us Reactor Memory Game (Raspberry Pi 4)
 
-Videojuego de memoria en cuadrícula 3x3 estilo el minijuego de Reactor de **Among Us**, desarrollado íntegramente en **Python 3** con **Pygame**, **OpenCV** y **NumPy**, optimizado para una **Raspberry Pi 4** con cámara USB externa.
+Videojuego de memoria en cuadrícula 3x3 estilo el minijuego de Reactor de **Among Us**, desarrollado en **Python** con **Pygame** y el **motor de visión artificial de MazeHaus** (Google MediaPipe Hand Landmarker + OpenCV CLAHE de respaldo), optimizado para una **Raspberry Pi 4** con cámara USB.
 
 ---
 
-## 🎮 Mecánica de Juego y Novedades
+## 🎮 Mecánica de Juego
 
 1. **Inicio con Dedo en el Centro (5 segundos):**
-   * El juego arranca en estado de espera (*Standby*).
-   * Para iniciar la partida, el jugador coloca su dedo en el **círculo central de la cámara** durante **5 segundos continuos**.
-   * Un anillo de progreso y beeps sonoros cuentan: `5.0s... 4.0s... 3.0s... 2.0s... 1.0s... ¡INICIANDO!`. Si retiras el dedo antes, se cancela y se reinicia.
-2. **Juego Infinito (Ronda 1 a $\infty$):**
-   * El juego ya no se detiene en 5 rondas: continúa agregando un nuevo paso por cada ronda superada de forma infinita.
-   * La secuencia se acumula y se acelera la destreza mental.
-3. **Pulsación de 2 Segundos (*Dwell Time*):** 
-   * Para validar cada panel, se debe mantener el dedo sobre el botón correspondiente durante **2.0 segundos continuos**.
-   * Una barra de energía interna llena el panel y un anillo circular gira alrededor del dedo con cuenta regresiva.
-4. **Game Over y Estado de Espera:**
-   * Si pulsas un panel fuera de orden: suena la alarma, la cuadrícula parpadea en rojo y se anuncia **GAME OVER**.
-   * Guarda automáticamente tu récord en `highscores.json` y vuelve al estado de espera para iniciar otra partida.
-5. **Salón de la Fama / Récords:**
-   * Registro persistente del jugador que llegó a la ronda más alta en la esquina superior y en la tarjeta de estadísticas.
+   * El juego inicia en modo de espera. Coloca la punta de tu dedo índice en el **círculo central de la cámara** durante **5 segundos**.
+   * Un anillo de progreso y beeps cuentan hasta el inicio (también puedes presionar **`Espacio`** para iniciar de inmediato).
+2. **Juego Infinito:**
+   * Cada ronda superada añade un nuevo paso a la secuencia sin límite (Ronda 1 a $\infty$).
+3. **Pulsación de 2 Segundos (*Dwell Time*):**
+   * Mantén tu dedo índice apuntando al panel correspondiente durante **2.0 segundos continuos** hasta que se cargue la barra de energía.
+4. **Game Over y Récords:**
+   * Si fallas, el reactor se bloquea con alarma roja, anuncia **GAME OVER**, guarda tu mejor ronda en `highscores.json` y vuelve al modo de espera.
 
 ---
 
-## 🖥️ Interfaz Separada y Ampliada (1280x720 HD)
+## ⚡ Motor de Visión Artificial (Adaptado de MazeHaus)
 
-* **Columna Izquierda:** Tablero de reactor gigante (500x500 px) con los 9 paneles retroiluminados estilo Among Us y barra de estado inferior.
-* **Columna Derecha:** Pantalla de cámara en vivo en alta definición (600x450 px) con:
-  * Cuadrícula virtual 3x3 semitransparente superpuesta sobre el video (para ver exactamente qué panel estás tocando con tu mano).
-  * Zona objetivo central para el inicio de 5 segundos.
-  * Selector e indicador del nombre real de la cámara USB activa.
-  * Tabla con el TOP 3 de mejores puntuaciones debajo del video.
-
----
-
-## ⚡ Visión Artificial Optimizada
-
-1. **Cero Parpadeos Negros:** Búfer de cuadros en caché persistente en Pygame para mantener la señal de video 100% fluida a 60 FPS sin apagones.
-2. **Detección Exclusiva de la Mano (Sin Confusión con el Rostro):**
-   * Clasificador Haar suprime la cabeza en el área superior.
-   * Algoritmo de puntuación geométrica que prioriza contornos que se originan desde abajo (brazo/mano) y que alcanzan mayor altura hacia el panel, ignorando el cuello o el torso.
-   * Segmentación dual combinada HSV + YCrCb para máxima fidelidad bajo cualquier iluminación.
-3. **Autodetección de Cámara USB:**
-   * Prioriza la cámara USB externa (`/dev/video2: XWF-1080P`) sobre la integrada.
-   * Permite alternar en caliente en cualquier momento pulsando la tecla **`C`**.
+1. **Google MediaPipe Hand Landmarker (Tasks API con aceleración XNNPACK):**
+   * Utiliza el modelo neuronal [`models/hand_landmarker.task`](file:///home/andres/Documents/OwnProjects/MemorizeIt-Raspberry/models/hand_landmarker.task) para rastrear con precisión sub-milimétrica los 21 puntos articulares de la mano.
+   * **El rostro es 100% inmune:** El modelo busca exclusivamente anatomía de manos y dedos, ignorando totalmente la cara, orejas y hombros.
+   * Rastrear específicamente el **Landmark 8** (punta del dedo índice) y detecta si el dedo está extendido.
+   * Muestra el esqueleto cinemático de la mano y el punto índice en verde brillante en la cámara.
+2. **Motor de Respaldo OpenCV (de MazeHaus):**
+   * Si MediaPipe no está instalado o no se encuentra el modelo, se activa automáticamente el `OpenCVHandTracker` nativo con normalización de luz **CLAHE**, segmentación dual YCrCb + HSV, prioridad espacial inferior y *lock-on tracking*.
+3. **Buffer de Latencia Mínima:**
+   * `CAP_PROP_BUFFERSIZE = 1` para respuesta instantánea en tiempo real.
 
 ---
 
-## 📦 Instalación
+## 🚀 Ejecución Rápida
 
-Instala las dependencias del sistema:
+Ejecuta el script de inicio (usa automáticamente el entorno con MediaPipe):
 
 ```bash
-chmod +x scripts/install_dependencies.sh
-./scripts/install_dependencies.sh
+./run.sh
 ```
 
-*(O manualmente vía APT: `sudo apt install -y python3-opencv python3-pygame python3-numpy v4l-utils`)*
-
----
-
-## 🚀 Ejecución
-
-Lanzar el juego:
+O directamente con el entorno virtual:
 ```bash
-python3 main.py
+.venv/bin/python main.py
 ```
 
-O forzando una cámara específica:
+O con `uv`:
 ```bash
-python3 main.py --cam 2
+uv run python main.py
 ```
 
-*(Teclas útiles: **`C`** para cambiar de cámara, **`Espacio`** para iniciar o salir de Game Over, **`Esc`** para cerrar).*
+*(Controles útiles: **`C`** para alternar cámaras, **`Espacio`** para iniciar/reiniciar, **`Esc`** para salir).*

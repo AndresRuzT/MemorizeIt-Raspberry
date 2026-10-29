@@ -418,11 +418,11 @@ class GameEngine:
         bar_surf.fill((10, 15, 24, 215))
         surface.blit(bar_surf, (title_box.x, title_box.y))
 
-        cam_name = f"CAM: {self.vision.get_camera_name()}"
+        cam_name = f"CAM: {self.vision.get_camera_name()} [{self.vision.tracker_name}]"
         cam_lbl = self.font_small.render(cam_name, True, (200, 240, 255))
         surface.blit(cam_lbl, (self.cam_x + 10, self.cam_y + 6))
 
-        switch_lbl = self.font_small.render("[C] Cam  [B] Calibrar  [Espacio] Iniciar", True, (255, 215, 80))
+        switch_lbl = self.font_small.render("[C] Cambiar Cam  [Espacio] Iniciar", True, (255, 215, 80))
         surface.blit(switch_lbl, (self.cam_x + self.cam_w - switch_lbl.get_width() - 10, self.cam_y + 6))
 
         # Dedo sobre la cámara (Cursor espejo)
