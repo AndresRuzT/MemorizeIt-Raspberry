@@ -26,9 +26,14 @@ class SoundSystem:
             self.panel_sounds = [self._create_tone(freq, 0.30, waveform='sine') for freq in frequencies]
             self.success_sound = self._create_tone(880.0, 0.45, waveform='sine')
             self.error_sound = self._create_tone(115.0, 0.50, waveform='square')
+            self.beep_sound = self._create_tone(520.0, 0.12, waveform='sine')
         except Exception as e:
             print(f"[SoundSystem] Aviso: No se pudo inicializar audio ({e}). El juego correrá en silencio.")
             self.initialized = False
+
+    def play_countdown_beep(self):
+        if self.initialized and self.beep_sound:
+            self.beep_sound.play()
 
     def play_panel_tone(self, index):
         if not self.initialized or index < 0 or index >= len(self.panel_sounds):
