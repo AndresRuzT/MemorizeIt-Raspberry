@@ -16,7 +16,8 @@ class Panel:
         self.timer = 0.0
 
 class GridPanel:
-    def __init__(self, area_rect, spacing=14):
+    def __init__(self, area_rect, spacing=16):
+        self.area_rect = area_rect
         self.spacing = spacing
         self.panels = []
 
@@ -64,13 +65,19 @@ class GridPanel:
         return None
 
     def draw(self, surface, charging_index=-1, charging_progress=0.0):
+        # Marco exterior del tablero reactor
+        outer_margin = 10
+        outer_rect = self.area_rect.inflate(outer_margin * 2, outer_margin * 2)
+        pygame.draw.rect(surface, (18, 24, 34), outer_rect, border_radius=16)
+        pygame.draw.rect(surface, (45, 62, 88), outer_rect, width=3, border_radius=16)
+
         for p in self.panels:
             base_col, border_col = self._get_colors(p.state)
 
             # Fondo del panel con esquinas redondeadas
-            pygame.draw.rect(surface, base_col, p.rect, border_radius=10)
+            pygame.draw.rect(surface, base_col, p.rect, border_radius=12)
 
-            # Si este panel está cargando los 2 segundos de pulsación, dibujar llenado de energía
+            # Si este panel está cargando los 2 segundos de pulsación, dibujar barra de energía ascendente
             if p.index == charging_index and charging_progress > 0.0:
                 fill_h = p.rect.height * min(1.0, charging_progress)
                 fill_rect = pygame.Rect(
@@ -80,18 +87,18 @@ class GridPanel:
                     fill_h
                 )
                 charge_surf = pygame.Surface((fill_rect.width, fill_rect.height), pygame.SRCALPHA)
-                charge_surf.fill((0, 240, 255, 90))
+                charge_surf.fill((0, 240, 255, 110))
                 surface.blit(charge_surf, (fill_rect.x, fill_rect.y))
                 border_col = (255, 235, 80)
 
-            # Borde
-            pygame.draw.rect(surface, border_col, p.rect, width=3, border_radius=10)
+            # Borde metálico estilo consola
+            pygame.draw.rect(surface, border_col, p.rect, width=4, border_radius=12)
 
-            # Centro brillante estilo consola reactor Among Us si está activo
+            # Centro brillante estilo Among Us cuando se ilumina
             if p.state in (PanelState.FLASHING, PanelState.PRESSED):
-                inner = p.rect.inflate(-p.rect.width * 0.4, -p.rect.height * 0.4)
+                inner = p.rect.inflate(-p.rect.width * 0.38, -p.rect.height * 0.38)
                 inner_surf = pygame.Surface((inner.width, inner.height), pygame.SRCALPHA)
-                inner_surf.fill((230, 250, 255, 170))
+                inner_surf.fill((235, 252, 255, 190))
                 surface.blit(inner_surf, (inner.x, inner.y))
 
     def _get_colors(self, state):

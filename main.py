@@ -6,17 +6,18 @@ from memorizeit.game import GameEngine
 
 def main():
     parser = argparse.ArgumentParser(description="MemorizeIt - Among Us Reactor Memory (Raspberry Pi 4)")
-    parser.add_argument("--cam", type=int, default=None, help="Índice de la cámara USB (ej. 2)")
+    parser.add_argument("--cam", type=int, default=None, help="Índice de la cámara (ej. 2 para USB, 0 para integrada)")
     parser.add_argument("cam_positional", type=int, nargs="?", default=None, help="Índice opcional posicional")
     args = parser.parse_args()
 
     chosen_cam = args.cam if args.cam is not None else args.cam_positional
 
-    screen_w = 800
-    screen_h = 600
+    # Resolución panorámica HD 1280x720 (tablero a la izquierda, cámara a la derecha)
+    screen_w = 1280
+    screen_h = 720
 
     pygame.init()
-    pygame.display.set_caption("MemorizeIt - Among Us Reactor (Python / Raspberry Pi 4)")
+    pygame.display.set_caption("MemorizeIt - Reactor Memory (Among Us) [Raspberry Pi 4]")
     screen = pygame.display.set_mode((screen_w, screen_h))
     clock = pygame.time.Clock()
 
@@ -25,7 +26,7 @@ def main():
 
     running = True
     while running:
-        dt = clock.tick(60) / 1000.0  # Delta time en segundos (60 FPS objetivo)
+        dt = clock.tick(60) / 1000.0  # 60 FPS estables
 
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
@@ -35,9 +36,9 @@ def main():
             else:
                 game.handle_event(event)
 
-        pointer_active, pointer_pos = game.update(dt)
+        pointer_active, norm_x, norm_y = game.update(dt)
 
-        game.draw(screen, pointer_active, pointer_pos)
+        game.draw(screen, pointer_active, norm_x, norm_y)
         pygame.display.flip()
 
     game.cleanup()
