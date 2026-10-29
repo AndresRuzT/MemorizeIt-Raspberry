@@ -33,18 +33,11 @@ Videojuego de memoria en cuadrícula 3x3 estilo el minijuego de Reactor de **Amo
 
 ## 📦 Instalación de Dependencias
 
-Ejecuta el script automatizado (requiere permisos sudo):
+Ejecuta el script automatizado (detecta automáticamente si estás en PC x86_64 o en Raspberry Pi ARM64 y configura Raylib y OpenCV):
 
 ```bash
 chmod +x scripts/install_dependencies.sh
 ./scripts/install_dependencies.sh
-```
-
-O instala los paquetes manualmente:
-
-```bash
-sudo apt update
-sudo apt install -y build-essential g++ make pkg-config libopencv-dev libraylib-dev libgl1-mesa-dev libx11-dev v4l-utils
 ```
 
 ---
@@ -68,13 +61,3 @@ O compila y ejecuta en un solo paso:
 ```bash
 make run
 ```
-
----
-
-## 📁 Estructura del Proyecto
-
-* [`include/VisionTracker.hpp`](file:///home/andres/Documents/OwnProjects/MemorizeIt-Raspberry/include/VisionTracker.hpp) / [`src/VisionTracker.cpp`](file:///home/andres/Documents/OwnProjects/MemorizeIt-Raspberry/src/VisionTracker.cpp): Captura V4L2 en hilo dedicado, detección de dedo por contornos, cálculo de coordenadas normalizadas y vista previa RGB.
-* [`include/GridPanel.hpp`](file:///home/andres/Documents/OwnProjects/MemorizeIt-Raspberry/include/GridPanel.hpp) / [`src/GridPanel.cpp`](file:///home/andres/Documents/OwnProjects/MemorizeIt-Raspberry/src/GridPanel.cpp): Cuadrícula 3x3 con animaciones de brillo cian, verde de acierto y rojo de fallo.
-* [`include/SoundSystem.hpp`](file:///home/andres/Documents/OwnProjects/MemorizeIt-Raspberry/include/SoundSystem.hpp) / [`src/SoundSystem.cpp`](file:///home/andres/Documents/OwnProjects/MemorizeIt-Raspberry/src/SoundSystem.cpp): Síntesis procedural de frecuencias para cada botón, sonido de acierto y zumbador de error.
-* [`include/GameEngine.hpp`](file:///home/andres/Documents/OwnProjects/MemorizeIt-Raspberry/include/GameEngine.hpp) / [`src/GameEngine.cpp`](file:///home/andres/Documents/OwnProjects/MemorizeIt-Raspberry/src/GameEngine.cpp): Máquina de estados del reactor, gestión de turnos, lógica de *dwell time* y progreso.
-* [`src/main.cpp`](file:///home/andres/Documents/OwnProjects/MemorizeIt-Raspberry/src/main.cpp): Ventana Raylib y bucle principal a 60 FPS.
