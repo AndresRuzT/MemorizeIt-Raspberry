@@ -320,11 +320,15 @@ class OpenCVHandTracker:
         raw_x = float(np.mean(top_pts[:, 0, 0])) / float(self.work_w)
         raw_y = float(np.mean(top_pts[:, 0, 1])) / float(self.work_h)
 
+        raw_x = max(0.0, min(1.0, raw_x))
+        raw_y = max(0.0, min(1.0, raw_y))
+
         fx, fy = self.filter_2d.filter(raw_x, raw_y, now)
+        fx = max(0.0, min(1.0, fx))
+        fy = max(0.0, min(1.0, fy))
+
         self.status_message = "DEDO INDICE (OK)"
-        scale_x = orig_w / float(self.work_w)
-        scale_y = orig_h / float(self.work_h)
-        self.last_contour = np.array(hand_cnt * [scale_x, scale_y], dtype=np.int32)
+        self.last_contour = hand_cnt
         return True, fx, fy, self.last_contour, True
 
     def close(self):
@@ -362,14 +366,13 @@ class VisionTracker:
         self.cached_surface: pygame.Surface | None = None
         self.pending_camera_change = None
 
-        # Cargar MediaPipe Hand Landmarker
+        # Load MediaPipe Hand Landmarker
         self.tracker_name = "OpenCV"
         self.tracker = None
 
         model_candidates = [
-            Path("models/hand_landmarker.task"),
-            Path(__file__).parent.parent / "models" / "hand_landmarker.task",
-            Path("/home/andres/Documents/OwnProjects/MazeHaus-Raspberry/models/hand_landmarker.task"),
+            Path("models/hand_landmarker.task").resolve(),
+            (Path(__file__).resolve().parent.parent / "models" / "hand_landmarker.task"),
         ]
         model_path = next((p for p in model_candidates if p.exists()), None)
 
@@ -440,6 +443,18 @@ class VisionTracker:
             self.pending_camera_change = next_idx
             print(f"[VisionTracker] Solicitando cambio a cámara: {next_idx} ({self.get_camera_name(next_idx)})")
 
+    def recalibrate_background(self):
+        """Resets tracking filters and internal states."""
+        with self.lock:
+            if self.tracker is not None:
+                if hasattr(self.tracker, "filter_2d"):
+                    self.tracker.filter_2d.reset()
+                if hasattr(self.tracker, "last_landmarks"):
+                    self.tracker.last_landmarks = None
+                if hasattr(self.tracker, "last_contour"):
+                    self.tracker.last_contour = None
+            print("[VisionTracker] Tracking filters recalibrated.")
+
     def get_camera_name(self, index=None):
         target = self.camera_index if index is None else index
         return self.camera_map.get(target, f"Cámara {target}")
@@ -487,103 +502,103 @@ class VisionTracker:
         pw = self.preview_w
         ph = self.preview_h
 
-        while self.running:
-            with self.lock:
-                req_change = self.pending_camera_change
-                self.pending_camera_change = None
+        try:
+            while self.running:
+                with self.lock:
+                    req_change = self.pending_camera_change
+                    self.pending_camera_change = None
 
-            if req_change is not None and req_change != self.camera_index:
-                if cap is not None:
-                    cap.release()
-                self.camera_index = req_change
-                cap = self._open_camera(self.camera_index)
+                if req_change is not None and req_change != self.camera_index:
+                    if cap is not None:
+                        cap.release()
+                    self.camera_index = req_change
+                    cap = self._open_camera(self.camera_index)
 
-            if cap is None or not cap.isOpened():
-                time.sleep(0.04)
-                continue
+                if cap is None or not cap.isOpened():
+                    time.sleep(0.04)
+                    continue
 
-            ret, raw_frame = cap.read()
-            if not ret or raw_frame is None or raw_frame.size == 0:
-                time.sleep(0.005)
-                continue
+                ret, raw_frame = cap.read()
+                if not ret or raw_frame is None or raw_frame.size == 0:
+                    time.sleep(0.005)
+                    continue
 
-            # Modo espejo horizontal
-            mirror_frame = cv2.flip(raw_frame, 1)
+                # Horizontal mirror mode
+                mirror_frame = cv2.flip(raw_frame, 1)
 
-            # Procesar detección
-            detected = False
-            tip_x, tip_y = 0.5, 0.5
-            extra_data = None
-            is_pointing = False
+                # Detection processing
+                detected = False
+                tip_x, tip_y = 0.5, 0.5
+                extra_data = None
+                is_pointing = False
 
-            if self.tracker is not None:
-                try:
-                    res = self.tracker.process_frame(mirror_frame)
-                    if len(res) == 5:
-                        detected, tip_x, tip_y, extra_data, is_pointing = res
-                    else:
-                        detected, tip_x, tip_y, extra_data = res[:4]
-                        is_pointing = detected
-                except Exception:
-                    detected = False
+                if self.tracker is not None:
+                    try:
+                        res = self.tracker.process_frame(mirror_frame)
+                        if len(res) == 5:
+                            detected, tip_x, tip_y, extra_data, is_pointing = res
+                        else:
+                            detected, tip_x, tip_y, extra_data = res[:4]
+                            is_pointing = detected
+                    except Exception:
+                        detected = False
 
-            hand_present = extra_data is not None
+                hand_present = extra_data is not None
 
-            result = FingertipData(
-                detected=detected,
-                norm_x=tip_x,
-                norm_y=tip_y,
-                raw_x=int(tip_x * pw),
-                raw_y=int(tip_y * ph),
-                hand_present=hand_present,
-                is_pointing=is_pointing,
-                status=self.tracker.status_message if self.tracker else "",
-            )
+                result = FingertipData(
+                    detected=detected,
+                    norm_x=tip_x,
+                    norm_y=tip_y,
+                    raw_x=int(tip_x * pw),
+                    raw_y=int(tip_y * ph),
+                    hand_present=hand_present,
+                    is_pointing=is_pointing,
+                    status=self.tracker.status_message if self.tracker else "",
+                )
 
-            # Pre-renderizar superficie del preview (600x450) en el hilo secundario
-            preview_bgr = cv2.resize(mirror_frame, (pw, ph), interpolation=cv2.INTER_LINEAR)
+                # Pre-render preview surface (600x450) on background thread
+                preview_bgr = cv2.resize(mirror_frame, (pw, ph), interpolation=cv2.INTER_LINEAR)
 
-            # Dibujar esqueleto / indicadores directamente en BGR (más rápido en OpenCV)
-            if isinstance(self.tracker, MediaPipeHandTracker) and extra_data:
-                pts = [(int(lm[0] * pw), int(lm[1] * ph)) for lm in extra_data]
-                bone_color = (120, 255, 0) if is_pointing else (0, 170, 255)
-                for p1, p2 in HAND_CONNECTIONS:
-                    cv2.line(preview_bgr, pts[p1], pts[p2], bone_color, 2)
-                for idx, pt in enumerate(pts):
-                    color = (200, 255, 0) if idx == INDEX_FINGER_TIP else (255, 255, 255)
-                    radius = 5 if idx == INDEX_FINGER_TIP else 3
-                    cv2.circle(preview_bgr, pt, radius, color, -1)
+                # Draw skeleton / landmarks
+                if isinstance(self.tracker, MediaPipeHandTracker) and extra_data:
+                    pts = [(int(lm[0] * pw), int(lm[1] * ph)) for lm in extra_data]
+                    bone_color = (120, 255, 0) if is_pointing else (0, 170, 255)
+                    for p1, p2 in HAND_CONNECTIONS:
+                        cv2.line(preview_bgr, pts[p1], pts[p2], bone_color, 2)
+                    for idx, pt in enumerate(pts):
+                        color = (200, 255, 0) if idx == INDEX_FINGER_TIP else (255, 255, 255)
+                        radius = 5 if idx == INDEX_FINGER_TIP else 3
+                        cv2.circle(preview_bgr, pt, radius, color, -1)
 
-            elif isinstance(self.tracker, OpenCVHandTracker) and extra_data is not None:
-                scale_x = pw / float(self.tracker.work_w)
-                scale_y = ph / float(self.tracker.work_h)
-                cnt_scaled = np.array(extra_data * [scale_x, scale_y], dtype=np.int32)
-                cv2.drawContours(preview_bgr, [cnt_scaled], -1, (255, 200, 0), 2)
+                elif isinstance(self.tracker, OpenCVHandTracker) and extra_data is not None:
+                    scale_x = pw / float(self.tracker.work_w)
+                    scale_y = ph / float(self.tracker.work_h)
+                    cnt_scaled = np.array(extra_data * [scale_x, scale_y], dtype=np.int32)
+                    cv2.drawContours(preview_bgr, [cnt_scaled], -1, (255, 200, 0), 2)
 
-            # Indicador de la punta del dedo índice (Landmark 8)
-            px = int(tip_x * pw)
-            py = int(tip_y * ph)
+                # Index fingertip reticle
+                px = int(tip_x * pw)
+                py = int(tip_y * ph)
 
-            if detected:
-                # Dedo índice activo apuntando
-                cv2.circle(preview_bgr, (px, py), 10, (120, 255, 0), -1)
-                cv2.circle(preview_bgr, (px, py), 18, (255, 255, 255), 2)
-                cv2.line(preview_bgr, (px - 24, py), (px + 24, py), (120, 255, 0), 2)
-                cv2.line(preview_bgr, (px, py - 24), (px, py + 24), (120, 255, 0), 2)
-                cv2.putText(preview_bgr, "DEDO INDICE", (px + 14, py - 10),
-                            cv2.FONT_HERSHEY_PLAIN, 1.2, (120, 255, 0), 2)
-            elif hand_present:
-                cv2.circle(preview_bgr, (px, py), 8, (0, 180, 255), 2)
-                cv2.putText(preview_bgr, "APUNTA CON EL INDICE", (px + 14, py - 10),
-                            cv2.FONT_HERSHEY_PLAIN, 1.1, (50, 200, 255), 2)
+                if detected:
+                    cv2.circle(preview_bgr, (px, py), 10, (120, 255, 0), -1)
+                    cv2.circle(preview_bgr, (px, py), 18, (255, 255, 255), 2)
+                    cv2.line(preview_bgr, (px - 24, py), (px + 24, py), (120, 255, 0), 2)
+                    cv2.line(preview_bgr, (px, py - 24), (px, py + 24), (120, 255, 0), 2)
+                    cv2.putText(preview_bgr, "DEDO INDICE", (px + 14, py - 10),
+                                cv2.FONT_HERSHEY_PLAIN, 1.2, (120, 255, 0), 2)
+                elif hand_present:
+                    cv2.circle(preview_bgr, (px, py), 8, (0, 180, 255), 2)
+                    cv2.putText(preview_bgr, "APUNTA CON EL INDICE", (px + 14, py - 10),
+                                cv2.FONT_HERSHEY_PLAIN, 1.1, (50, 200, 255), 2)
 
-            # Conversión ultra-rápida a Pygame Surface con C-level frombuffer
-            preview_rgb = cv2.cvtColor(preview_bgr, cv2.COLOR_BGR2RGB)
-            preview_surface = pygame.image.frombuffer(preview_rgb.tobytes(), (pw, ph), "RGB")
+                # Ultra-fast Pygame Surface conversion
+                preview_rgb = cv2.cvtColor(preview_bgr, cv2.COLOR_BGR2RGB)
+                preview_surface = pygame.image.frombuffer(preview_rgb.tobytes(), (pw, ph), "RGB")
 
-            with self.lock:
-                self.fingertip = result
-                self.cached_surface = preview_surface
-
-        if cap is not None and cap.isOpened():
-            cap.release()
+                with self.lock:
+                    self.fingertip = result
+                    self.cached_surface = preview_surface
+        finally:
+            if cap is not None and cap.isOpened():
+                cap.release()

@@ -3,14 +3,9 @@ import sys
 import os
 from pathlib import Path
 
-# Auto-reexec into .venv if not already running in it (ensures MediaPipe is available)
-_venv_python = (Path(__file__).parent / ".venv" / "bin" / "python").absolute()
-if not _venv_python.exists():
-    _alt_venv = Path("/home/andres/Documents/OwnProjects/MazeHaus-Raspberry/.venv/bin/python").absolute()
-    if _alt_venv.exists():
-        _venv_python = _alt_venv
-
-if _venv_python.exists() and Path(sys.executable).absolute() != _venv_python:
+# Auto-reexec into .venv if present and not already running in it
+_venv_python = (Path(__file__).resolve().parent / ".venv" / "bin" / "python")
+if _venv_python.exists() and Path(sys.executable).resolve() != _venv_python:
     os.execv(str(_venv_python), [str(_venv_python)] + sys.argv)
 
 import argparse

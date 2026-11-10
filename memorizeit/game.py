@@ -175,10 +175,12 @@ class GameEngine:
             elif event.key == pygame.K_r:
                 self.state = GameState.WAITING_START
                 self.center_hover_duration = 0.0
+                self.grid.set_all_state(PanelState.IDLE, duration=0.0)
             elif event.key in (pygame.K_SPACE, pygame.K_RETURN):
                 if self.state == GameState.GAME_OVER:
                     self.state = GameState.WAITING_START
                     self.center_hover_duration = 0.0
+                    self.grid.set_all_state(PanelState.IDLE, duration=0.0)
                 elif self.state == GameState.WAITING_START:
                     self.start_infinite_game()
 
@@ -267,29 +269,31 @@ class GameEngine:
         expected = self.full_sequence[self.player_step]
 
         if index == expected:
-            # Acierto parcial
+            # Correct step
             self.grid.set_panel_state(index, PanelState.PRESSED, duration=0.35)
             self.sound.play_panel_tone(index)
             self.player_step += 1
 
             if self.player_step >= len(self.full_sequence):
-                # ¡Ronda completada con éxito!
+                # Round cleared
                 self.state = GameState.ROUND_WON
                 self.timer = 0.90
                 self.grid.set_all_state(PanelState.SUCCESS, duration=0.65)
                 self.sound.play_success_chime()
-
-                # Actualizar récord inmediatamente si se superó
-                self.is_new_record = self.score_mgr.add_score("Tripulante", self.current_round)
+                self.is_new_record = self.current_round > self.score_mgr.best_round
         else:
-            # ¡Fallo en el reactor! (Game Over)
+            # Reactor failure (Game Over)
             self.state = GameState.GAME_OVER
             self.game_over_timer = 3.8
             self.grid.set_all_state(PanelState.ERROR, duration=1.0)
             self.sound.play_error_buzzer()
 
-            # Guardar puntuación final
-            self.is_new_record = self.score_mgr.add_score("Tripulante", self.current_round)
+            # Record final completed rounds count upon game over
+            cleared_rounds = self.current_round - 1
+            if cleared_rounds > 0:
+                self.is_new_record = self.score_mgr.add_score("Tripulante", cleared_rounds)
+            else:
+                self.is_new_record = False
 
     def draw(self, surface, pointer_active, norm_x, norm_y):
         surface.fill((12, 16, 24))
@@ -396,12 +400,14 @@ class GameEngine:
         else:
             pygame.draw.rect(surface, (0, 0, 0), (self.cam_x, self.cam_y, self.cam_w, self.cam_h), border_radius=10)
 
-        # Superponer cuadrícula 3x3 semitransparente sobre la cámara
+        # Overlay 3x3 grid on camera view
         cell_w = self.cam_w / 3.0
         cell_h = self.cam_h / 3.0
         for i in range(1, 3):
-            pygame.draw.line(surface, (80, 160, 220, 120), (self.cam_x + i * cell_w, self.cam_y), (self.cam_x + i * cell_w, self.cam_y + self.cam_h), 1)
-            pygame.draw.line(surface, (80, 160, 220, 120), (self.cam_x, self.cam_y + i * cell_h), (self.cam_x + self.cam_w, self.cam_y + i * cell_h), 1)
+            lx = int(self.cam_x + i * cell_w)
+            ly = int(self.cam_y + i * cell_h)
+            pygame.draw.line(surface, (80, 160, 220), (lx, self.cam_y), (lx, self.cam_y + self.cam_h), 1)
+            pygame.draw.line(surface, (80, 160, 220), (self.cam_x, ly), (self.cam_x + self.cam_w, ly), 1)
 
         # EN ESTADO DE ESPERA: Dibujar zona central de inicio (5 segundos)
         if self.state == GameState.WAITING_START:

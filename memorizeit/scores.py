@@ -32,15 +32,17 @@ class ScoreManager:
 
     def save(self):
         try:
+            self.scores = self.scores[:10]
             data = {
                 "best_round": self.best_round,
                 "best_player": self.best_player,
-                "scores": self.scores[:10]  # Guardar top 10
+                "scores": self.scores
             }
             with open(SCORES_FILE, "w", encoding="utf-8") as f:
                 json.dump(data, f, indent=2, ensure_ascii=False)
+                f.write("\n")
         except Exception as e:
-            print(f"[ScoreManager] Error guardando récords: {e}")
+            print(f"[ScoreManager] Error saving highscores: {e}")
 
     def add_score(self, player_name, round_reached):
         if round_reached <= 0:
@@ -48,15 +50,16 @@ class ScoreManager:
 
         is_new_best = round_reached > self.best_round
 
+        player_clean = (player_name or "").strip() or "Tripulante"
         record = {
-            "player": player_name if player_name.strip() else "Tripulante",
+            "player": player_clean,
             "round": round_reached,
             "date": datetime.now().strftime("%Y-%m-%d %H:%M")
         }
 
         self.scores.append(record)
-        # Ordenar por ronda descendente
         self.scores.sort(key=lambda x: x["round"], reverse=True)
+        self.scores = self.scores[:10]
 
         if is_new_best:
             self.best_round = round_reached
