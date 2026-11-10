@@ -1,5 +1,7 @@
 # MemorizeIt: Touchless Reactor Memory Game for Raspberry Pi 4
 
+![MemorizeIt Game Setup](assets/MemorizeIt.png)
+
 MemorizeIt is a contactless 3x3 grid memory game inspired by the Among Us reactor sequence. Built in Python with Pygame, OpenCV, and Google MediaPipe, the system runs on a Raspberry Pi 4 (Broadcom BCM2711, Quad-Core ARM Cortex-A72 @ 1.8 GHz) equipped with a USB webcam or CSI camera. Players interact entirely through computer-vision-based finger tracking in mid-air.
 
 ---
