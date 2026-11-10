@@ -13,7 +13,7 @@ import pygame
 from memorizeit.game import GameEngine
 
 def main():
-    parser = argparse.ArgumentParser(description="MemorizeIt - Among Us Reactor Memory (Raspberry Pi 4)")
+    parser = argparse.ArgumentParser(description="MemorizeIt - Touchless Grid Memory Game (Raspberry Pi 4)")
     parser.add_argument("--cam", type=int, default=None, help="Índice de la cámara (ej. 2 para USB, 0 para integrada)")
     parser.add_argument("cam_positional", type=int, nargs="?", default=None, help="Índice opcional posicional")
     args = parser.parse_args()

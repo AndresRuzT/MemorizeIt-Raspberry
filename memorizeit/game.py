@@ -282,7 +282,7 @@ class GameEngine:
                 self.sound.play_success_chime()
                 self.is_new_record = self.current_round > self.score_mgr.best_round
         else:
-            # Reactor failure (Game Over)
+            # Game Over
             self.state = GameState.GAME_OVER
             self.game_over_timer = 3.8
             self.grid.set_all_state(PanelState.ERROR, duration=1.0)
@@ -291,7 +291,7 @@ class GameEngine:
             # Record final completed rounds count upon game over
             cleared_rounds = self.current_round - 1
             if cleared_rounds > 0:
-                self.is_new_record = self.score_mgr.add_score("Tripulante", cleared_rounds)
+                self.is_new_record = self.score_mgr.add_score("Jugador", cleared_rounds)
             else:
                 self.is_new_record = False
 
@@ -302,7 +302,7 @@ class GameEngine:
         pygame.draw.rect(surface, (18, 24, 34), (0, 0, self.screen_width, 60))
         pygame.draw.line(surface, (40, 56, 80), (0, 60), (self.screen_width, 60), 2)
 
-        title_surf = self.font_title.render("REACTOR MEMORY", True, (160, 220, 255))
+        title_surf = self.font_title.render("MEMORIZE IT", True, (160, 220, 255))
         surface.blit(title_surf, (35, 14))
 
         # Indicador de Ronda y Récord
@@ -377,7 +377,7 @@ class GameEngine:
             col = (50, 240, 120)
 
         elif self.state == GameState.GAME_OVER:
-            msg = f"GAME OVER - REACTOR BLOQUEADO! (Llegaste a la Ronda {self.current_round})"
+            msg = f"GAME OVER - SECUENCIA INCORRECTA! (Llegaste a la Ronda {self.current_round})"
             col = (255, 60, 70)
 
         banner_rect = pygame.Rect(self.grid.area_rect.x - 10, self.grid.area_rect.bottom + 16, self.grid.area_rect.width + 20, 48)

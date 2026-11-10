@@ -76,7 +76,7 @@ class GridPanel:
         return None
 
     def draw(self, surface, charging_index=-1, charging_progress=0.0):
-        # Marco exterior del tablero reactor
+        # Marco exterior del tablero de juego
         outer_margin = 10
         outer_rect = self.area_rect.inflate(outer_margin * 2, outer_margin * 2)
         pygame.draw.rect(surface, (18, 24, 34), outer_rect, border_radius=16)
@@ -105,7 +105,7 @@ class GridPanel:
             # Borde metálico estilo consola
             pygame.draw.rect(surface, border_col, p.rect, width=4, border_radius=12)
 
-            # Centro brillante estilo Among Us cuando se ilumina
+            # Centro brillante cuando se ilumina
             if p.state in (PanelState.FLASHING, PanelState.PRESSED):
                 inner_x = p.rect.centerx - self.inner_surf.get_width() // 2
                 inner_y = p.rect.centery - self.inner_surf.get_height() // 2

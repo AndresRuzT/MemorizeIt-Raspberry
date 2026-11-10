@@ -50,7 +50,7 @@ class ScoreManager:
 
         is_new_best = round_reached > self.best_round
 
-        player_clean = (player_name or "").strip() or "Tripulante"
+        player_clean = (player_name or "").strip() or "Jugador"
         record = {
             "player": player_clean,
             "round": round_reached,

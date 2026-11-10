@@ -1,8 +1,8 @@
-# MemorizeIt: Touchless Reactor Memory Game for Raspberry Pi 4
+# MemorizeIt: Touchless Grid Memory Game for Raspberry Pi 4
 
 ![MemorizeIt Game Setup](assets/MemorizeIt.png)
 
-MemorizeIt is a contactless 3x3 grid memory game inspired by the Among Us reactor sequence. Built in Python with Pygame, OpenCV, and Google MediaPipe, the system runs on a Raspberry Pi 4 (Broadcom BCM2711, Quad-Core ARM Cortex-A72 @ 1.8 GHz) equipped with a USB webcam or CSI camera. Players interact entirely through computer-vision-based finger tracking in mid-air.
+MemorizeIt is a contactless 3x3 grid memory game developed in Python using Pygame, OpenCV, and Google MediaPipe. The system is designed for a Raspberry Pi 4 (Broadcom BCM2711, Quad-Core ARM Cortex-A72 @ 1.8 GHz) with a standard USB webcam or CSI camera module. Players interact completely touch-free using computer-vision-based finger tracking in mid-air.
 
 ---
 
@@ -27,10 +27,10 @@ The system runs a thread-decoupled architecture designed to sustain a 60 FPS use
 ## Game Rules and Interaction
 
 * **Start Dwell (5 Seconds):** From standby mode, hold your index finger within the central circle of the camera feed for 5 continuous seconds. A circular progress ring and countdown beeps will confirm initiation.
-* **Pattern Playback:** The reactor displays a randomized sequence across the 9 panels, accompanied by corresponding audio frequencies (C4 to D5).
+* **Pattern Playback:** The board displays a randomized sequence across the 9 panels, accompanied by corresponding audio frequencies (C4 to D5).
 * **Panel Dwell (2.0 Seconds):** Aim your index finger at the target panel for 2.0 continuous seconds to charge the energy bar and submit your choice. A 0.20-second loss-of-tracking tolerance prevents accidental input breaks.
 * **Infinite Progression:** Clearing a sequence increments the round counter and appends another panel to the pattern.
-* **Reactor Meltdown (Game Over):** Selecting an incorrect panel triggers an emergency alarm, flashes the grid red, saves the final completed score to `highscores.json`, and returns to standby.
+* **Sequence Mismatch (Game Over):** Selecting an incorrect panel triggers an error alarm, flashes the grid red, saves the final completed score to `highscores.json`, and returns to standby.
 
 ---
 
